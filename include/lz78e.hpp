@@ -5,11 +5,10 @@
 
 namespace yph
 {
-
     class LZ78E
     {
     private:
-        int maxDictionarySize;
+        size_t maxDictionarySize;
         unordered_map<string, size_t> symbols;
         vector<string> dictionary;
         vector<pair<size_t, char>> result;
@@ -20,19 +19,19 @@ namespace yph
         string binaryOrig;
         string suffix;
         void reset();
-        void load(string inputName, std::function<void(char)> callback);
-        void encode(string toCoded);
+        void load(const string &inputName, std::function<void(char &&)> callback);
+        void encode(const string &toCoded);
 
     public:
-        LZ78E(int ds);
+        LZ78E(size_t &&ds);
         ~LZ78E();
-        void encode(string inputName, bool binaryOrAscii);
-        void dump(std::function<void(std::stringstream &, char)> callback);
+        void encode(const string &inputName, bool binaryOrAscii);
+        void save(std::function<void(std::stringstream &, char)> callback);
         string getOutputName();
         string getInputSuffix();
     };
 
-    LZ78E::LZ78E(int ds = 8)
+    LZ78E::LZ78E(size_t &&ds = 256)
     {
         maxDictionarySize = ds;
         reset();
@@ -56,7 +55,7 @@ namespace yph
         symbols.emplace("", 0);
     }
 
-    void LZ78E::load(string inputName, std::function<void(char)> callback)
+    void LZ78E::load(const string &inputName, std::function<void(char &&)> callback)
     {
         outputName = inputName;
         outputName.erase(outputName.rfind(DELIMETER), outputName.length());
@@ -67,11 +66,11 @@ namespace yph
 
         if (fin.is_open())
         {
-            //std::cout << "load input file" << std::endl;
+
             char c;
             while (fin.get(c))
             {
-                callback(c);
+                callback(std::move(c));
             }
         }
         else
@@ -79,10 +78,9 @@ namespace yph
             std::cout << "cannot open the input file" << std::endl;
         }
         fin.close();
-        // std::cout << "close the file" << std::endl;
     }
 
-    void LZ78E::dump(std::function<void(std::stringstream &, char)> callback)
+    void LZ78E::save(std::function<void(std::stringstream &, char)> callback)
     {
         // dictionary size, codeword length (key length), index length
         std::ofstream fout(outputName, std::ios::out | std::ios::binary);
@@ -94,7 +92,6 @@ namespace yph
             dl /= 2;
         }
         fout << indexLength << " ";
-        // std::cout << indexLength << std::endl;
 
         std::stringstream ss;
         for (auto r : result)
@@ -103,8 +100,6 @@ namespace yph
             first = first.substr(first.length() - indexLength);
             ss << first;
             callback(ss, r.second);
-            // std::cout << first << std::endl;
-            // std::cout << r.second << std::endl;
         }
 
         string binaryCodes = "";
@@ -119,7 +114,6 @@ namespace yph
         if (fout.is_open())
         {
             fout.write(codes.c_str(), codes.length());
-            //std::cout << "write codes of length" << codes.length() << std::endl;
         }
         else
         {
@@ -128,9 +122,9 @@ namespace yph
         fout.close();
     }
 
-    void LZ78E::encode(string toCoded)
+    void LZ78E::encode(const string &toCoded)
     {
-        // std::cout << binaryOrig.substr(binaryOrig.length() - 64) << std::endl;
+
         for (auto c : toCoded)
         {
             string key = prev + c;
@@ -146,7 +140,7 @@ namespace yph
                     symbols.emplace(key, dictionary.size() - 1);
                 }
                 result.emplace_back(symbols.find(prev)->second, c);
-                // std::cout << key << ":" << symbols.find(prev)->second << "," << c << std::endl;
+
                 prev.clear();
             }
         }
@@ -157,27 +151,27 @@ namespace yph
         }
     }
 
-    void LZ78E::encode(string inputName, bool binaryOrAscii)
+    void LZ78E::encode(const string &inputName, bool binaryOrAscii)
     {
         reset();
         if (binaryOrAscii)
         {
-            load(inputName, [&](char c) {
+            load(inputName, [&](char &&c) {
                 Byte b(static_cast<unsigned long long>(char2unsign(c)));
                 binaryOrig += b.to_string();
             });
             encode(binaryOrig);
-            dump([](std::stringstream &ss, char c) {
+            save([](std::stringstream &ss, char c) {
                 ss << c;
             });
         }
         else
         {
-            load(inputName, [&](char c) {
+            load(inputName, [&](char &&c) {
                 orig += c;
             });
             encode(orig);
-            dump([](std::stringstream &ss, char c) {
+            save([](std::stringstream &ss, char c) {
                 ss << Byte(char2unsign(c)).to_string();
             });
         }
