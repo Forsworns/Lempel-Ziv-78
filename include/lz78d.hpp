@@ -18,12 +18,12 @@ namespace yph
         size_t indexLength;
         void reset();
         void load(const string &inputName, const string &targetSuffix);
-        void decode(int &&codeLength); // code length 1 for binary, 8 for ascii
+        void decode(size_t codeLength); // code length 1 for binary, 8 for ascii
 
     public:
         LZ78D();
         ~LZ78D();
-        void decode(const string &inputName, const string &targetSuffix, bool binaryOrAscii);
+        void decode(const string &inputName, const string &targetSuffix, size_t bitLength);
         void save();
     };
 
@@ -53,7 +53,7 @@ namespace yph
         outputName = inputName;
         outputName.erase(outputName.rfind(DELIMETER), outputName.length());
         outputName += ("_lz78." + targetSuffix);
-        std::cout << "input file: " << inputName << ", output file: " << outputName << std::endl;
+        // std::cout << "input file: " << inputName << ", output file: " << outputName << std::endl;
         std::ifstream fin(inputName, std::ios::in | std::ios::binary);
 
         if (fin.is_open())
@@ -107,15 +107,15 @@ namespace yph
         fout.close();
     }
 
-    void LZ78D::decode(int &&codeLength)
+    void LZ78D::decode(size_t codeLength)
     {
-        // the length may not be divided by (indexLength+1)
         for (size_t i = 0; i < binaryCodes.length(); i += (indexLength + codeLength))
         {
-            // indexLength+1 because the coding is (index,0/1) in binary case
             string binaryIdx = binaryCodes.substr(i, indexLength);
             size_t idx = bStr2Num(binaryIdx);
             string codeword = dictionary[idx] + binaryCodes.substr(i + indexLength, codeLength); // pay attention to the index
+            // If the string is shorter than codeLength, the substr() would read as many characters as possible.
+            // That is, the substr has dealt with the incomplete last symbol for us already.
             if (symbols.find(codeword) == symbols.end())
             {
                 dictionary.push_back(codeword); // the part exceeding the maximum dictionary size in encoder will never be referred
@@ -125,18 +125,11 @@ namespace yph
         }
     }
 
-    void LZ78D::decode(const string &inputName, const string &targetSuffix, bool binaryOrAscii)
+    void LZ78D::decode(const string &inputName, const string &targetSuffix, size_t bitLength)
     {
         reset();
         load(inputName, targetSuffix);
-        if (binaryOrAscii)
-        {
-            decode(1); // 0 or 1 only takes 1 bit
-        }
-        else
-        {
-            decode(8); // ascii takes 8 bits
-        }
+        decode(bitLength);
         save();
     }
 

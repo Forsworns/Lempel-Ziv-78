@@ -11,13 +11,14 @@ namespace yph
         size_t maxDictionarySize;
         unordered_map<string, size_t> symbols;
         vector<string> dictionary;
-        vector<pair<size_t, char>> result;
+        vector<pair<size_t, string>> result;
         string prev;
         string outputName;
         string codes;
         string orig;
         string binaryOrig;
         string suffix;
+        size_t bitLength;
         void reset();
         void load(const string &inputName, std::function<void(char &&)> callback);
         void encode(const string &toCoded);
@@ -25,8 +26,8 @@ namespace yph
     public:
         LZ78E(size_t &&ds);
         ~LZ78E();
-        void encode(const string &inputName, bool binaryOrAscii);
-        void save(std::function<void(std::stringstream &, char)> callback);
+        void encode(const string &inputName, size_t bitLength);
+        void save(std::function<void(std::stringstream &, string)> callback);
         string getOutputName();
         string getInputSuffix();
     };
@@ -51,6 +52,7 @@ namespace yph
         binaryOrig = "";
         codes = "";
         suffix = "";
+        bitLength = 0;
         dictionary.emplace_back(""); // remember add the empty string into the dictionary
         symbols.emplace("", 0);
     }
@@ -61,7 +63,7 @@ namespace yph
         outputName.erase(outputName.rfind(DELIMETER), outputName.length());
         outputName += ".lz78";
         suffix = inputName.substr(inputName.rfind(DELIMETER) + 1);
-        std::cout << "input file: " << inputName << ", output file: " << outputName << std::endl;
+        // std::cout << "input file: " << inputName << ", output file: " << outputName << std::endl;
         std::ifstream fin(inputName, std::ios::in | std::ios::binary);
 
         if (fin.is_open())
@@ -80,7 +82,7 @@ namespace yph
         fin.close();
     }
 
-    void LZ78E::save(std::function<void(std::stringstream &, char)> callback)
+    void LZ78E::save(std::function<void(std::stringstream &, string)> callback)
     {
         // dictionary size, codeword length (key length), index length
         std::ofstream fout(outputName, std::ios::out | std::ios::binary);
@@ -96,7 +98,7 @@ namespace yph
         std::stringstream ss;
         for (auto r : result)
         {
-            string first = std::bitset<sizeof(decltype(r.first)) * 8>(r.first).to_string();
+            string first = std::bitset<sizeof(decltype(r.first)) * 8>(r.first).to_string(); // the bitset size must be known during compiling
             first = first.substr(first.length() - indexLength);
             ss << first;
             callback(ss, r.second);
@@ -114,6 +116,7 @@ namespace yph
         if (fout.is_open())
         {
             fout.write(codes.c_str(), codes.length());
+            std::cout << binaryCodes.length() / 8 << std::endl;
         }
         else
         {
@@ -124,9 +127,10 @@ namespace yph
 
     void LZ78E::encode(const string &toCoded)
     {
-
-        for (auto c : toCoded)
+        size_t i = 0;
+        for (; i < toCoded.length() - toCoded.length() % bitLength; i += bitLength)
         {
+            string c = toCoded.substr(i, bitLength);
             string key = prev + c;
             if (symbols.find(key) != symbols.end()) // pay attention, the last key may not be processed in the loop!
             {
@@ -144,35 +148,49 @@ namespace yph
                 prev.clear();
             }
         }
-        if (prev.length() != 0)
+        if (i != toCoded.length())
         {
-            prev.erase(prev.length() - 1);
-            result.emplace_back(symbols.find(prev)->second, toCoded[toCoded.length() - 1]);
+            string c = toCoded.substr(i);
+            result.emplace_back(symbols.find(prev)->second, c);
+            prev.clear();
+        }
+        else
+        {
+            if (prev.length() != 0)
+            {
+                result.emplace_back(symbols.find(prev.substr(0, prev.length() - bitLength))->second, prev.substr(prev.length() - bitLength));
+                prev.clear();
+            }
         }
     }
 
-    void LZ78E::encode(const string &inputName, bool binaryOrAscii)
+    void LZ78E::encode(const string &inputName, size_t bs)
     {
         reset();
-        if (binaryOrAscii)
+        bitLength = bs;
+        if (bitLength % 8 != 0)
         {
             load(inputName, [&](char &&c) {
                 Byte b(static_cast<unsigned long long>(char2unsign(c)));
                 binaryOrig += b.to_string();
             });
             encode(binaryOrig);
-            save([](std::stringstream &ss, char c) {
+            save([](std::stringstream &ss, string c) {
                 ss << c;
             });
         }
         else
         {
+            bitLength = bitLength / 8;
             load(inputName, [&](char &&c) {
                 orig += c;
             });
             encode(orig);
-            save([](std::stringstream &ss, char c) {
-                ss << Byte(char2unsign(c)).to_string();
+            save([](std::stringstream &ss, string c) {
+                for (auto b : c)
+                {
+                    ss << Byte(char2unsign(b)).to_string();
+                }
             });
         }
     }
