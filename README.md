@@ -5,21 +5,24 @@
 
 Yet another [Lempel-Ziv-78](https://en.wikipedia.org/wiki/LZ77_and_LZ78) implementation in mordern C++. Also adopt the ideas from [Lempel–Ziv–Welch](https://en.wikipedia.org/wiki/Lempel%E2%80%93Ziv%E2%80%93Welch).
 
-For test
+Support any dictionary size and any coding symbol. 
+
+For example, 8-bit (ascii) symbols as coding units with a dictionary of size 8096
+
 ```shell
 make clean
 cmake .
 make
-./obj/lz78_test ./data/0.txt 8096 any_flag_enable_binary
+./obj/lz78_test ./data/txt.txt 8096 8
 ```
 
 Example:
 
 ```C++
-LZ78E encoder(stoi(dictionarySize));
-encoder.encode(inputName, binaryOrAscii);
+LZ78E encoder(dictionarySize);
+encoder.encode(inputName, symbolLength);
 
 LZ78D decoder;
-decoder.decode(encoder.getOutputName(), encoder.getInputSuffix(), binaryOrAscii);
+decoder.decode(outputName, outputSuffix, symbolLength);
 ```
 
